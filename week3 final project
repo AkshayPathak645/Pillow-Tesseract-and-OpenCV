@@ -1,0 +1,95 @@
+import cv2 as cv
+import os
+from PIL import Image, ImageDraw, ImageEnhance
+import string
+import pytesseract
+
+#These lines should not be added while writing code on Jupyter
+face_cascade = cv.CascadeClassifier("frontalFace10\haarcascade_frontalface_alt.xml")
+
+
+# Optical Character Reading :
+def binarization(pil_img, threshold_value) :
+    pil_img = pil_img.convert("L")
+
+    for x in range(pil_img.width):
+        for y in range(pil_img.height):
+            if pil_img.getpixel( (x,y) ) <threshold_value :
+                pil_img.putpixel( (x,y), 0)
+            else:
+                pil_img.putpixel( (x,y), 255)
+    return pil_img
+
+
+#Face Detect :
+def cv_module(image_name):
+
+    cv_img = cv.imread(r"images\{}".format(image_name))
+
+    cv_img_binary = cv.threshold(cv_img,120,255,cv.THRESH_BINARY)[1]
+
+    #Getting Co-ordintes
+    faces = face_cascade.detectMultiScale(cv_img,1.25)
+
+    return faces
+
+# Creating Contact Sheet :
+def pil_module(image_name):
+    try :
+        list_of_cropped_faces =[]
+        pil_image = Image.open(r"images\{}".format(image_name))
+    #pil_image = Image.open(image_name)
+
+        img_draw = ImageDraw.Draw(pil_image)
+    # Now we have to get co-ordinates for faces
+        faces = cv_module(image_name)
+
+        for x,y,w,h in faces :
+        #Instead of drawing rectangle we need to crop it and save to a list
+        #img_draw.rectangle((x,y,x+w,y+h),outline='white')
+            cropped_img = pil_image.crop((x,y,x+w,y+h))
+            list_of_cropped_faces.append(cropped_img)
+
+        reference_pic = list_of_cropped_faces[0]
+        print("Results found in file {}".format(image_name))
+
+    #Contact Sheet should have 5 pics in single row
+        contact_sheet = Image.new(reference_pic.mode, (reference_pic.width*5, reference_pic.height*5))
+        x = 0
+        y = 0
+    
+    #setting reference_pic width and height:
+        width = reference_pic.width
+        height = reference_pic.height
+        for img in list_of_cropped_faces:
+        #Resizing the face found to the size of the reference image =
+            img = img.resize( (width,height) )
+
+            contact_sheet.paste(img,(x,y))
+
+            if x + reference_pic.width == contact_sheet.width:
+                x = 0
+                y += reference_pic.height
+            else:
+                x += reference_pic.width
+
+    #pil_image.show()
+        return contact_sheet.show()
+    except Exception :
+        print("Result found but no face found in {}".format(image))
+
+#Iterating over files:
+for image in os.listdir('images'):
+    
+    #Convert image to text
+    pil_img = Image.open(r"images\{}".format(image))
+
+    text = pytesseract.image_to_string(binarization(pil_img, 165))
+
+    search_word = "mark"
+    if search_word in text.lower():
+        pil_module(image)
+
+
+
+
